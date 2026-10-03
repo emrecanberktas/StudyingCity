@@ -3,6 +3,7 @@ extends Control
 
 const Buildings := preload("res://scripts/buildings.gd")
 const Iso := preload("res://scripts/iso.gd")
+const BuildingArt := preload("res://scripts/building_art.gd")
 
 const WORKERS := 4
 const SKIN := Color("f1c27d")
@@ -27,7 +28,7 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if building_id == "":
 		return
-	var tw := minf(size.x * 0.55, size.y * 0.6)
+	var tw := minf(minf(size.x * 0.55, size.y * 0.6), size.y * 0.5 / (maxf(Buildings.height(building_id), 0.4) * 0.6 + 0.35))
 	var base := Vector2(size.x * 0.5, size.y * 0.62)
 	var full_h := maxf(Buildings.height(building_id), 0.4) * tw * 0.6
 
@@ -39,8 +40,9 @@ func _draw() -> void:
 		Iso.draw_box(self, pile + Vector2(i * tw * 0.06 - tw * 0.06, -i * tw * 0.03), tw * 0.22, tw * 0.05, BRICK, 1.0)
 
 	if progress > 0.005:
-		Iso.draw_box(self, base, tw, full_h * progress, Buildings.color(building_id))
-	Iso.draw_box_outline(self, base, tw, full_h, Color(1, 1, 1, 0.6))
+		BuildingArt.draw(self, building_id, base, tw, progress)
+	var frame_scale := 0.42 if building_id == "tower" else 0.72
+	Iso.draw_box_outline(self, base, tw, full_h, Color(1, 1, 1, 0.6), frame_scale)
 
 	_draw_workers(base, pile, tw)
 

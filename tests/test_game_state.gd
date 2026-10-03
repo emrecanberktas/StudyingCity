@@ -16,6 +16,8 @@ func _initialize() -> void:
 	_test_shop()
 	_test_city_grows()
 	_test_save_roundtrip()
+	_test_daily_and_streak()
+	_test_move_building()
 	print("FAILURES: %d" % _failures)
 	quit(1 if _failures > 0 else 0)
 
@@ -144,3 +146,53 @@ func _test_save_roundtrip() -> void:
 	gs.free()
 	gs2.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_save.json"))
+
+
+func _finish_session(gs: Node, minutes: int) -> void:
+	gs.inventory.append("house")
+	gs.start_session("house", minutes)
+	gs.clock_override += minutes * 60 + 1
+	gs.session["last_seen"] = gs.now() - 1
+	gs.tick()
+
+
+func _test_daily_and_streak() -> void:
+	print("daily log and streak")
+	var gs := _fresh()
+	gs.clock_override = 1790000000.0  # sabit bir gün
+	_check(gs.current_streak() == 0, "no streak at start")
+	_finish_session(gs, 25)
+	_finish_session(gs, 30)
+	_check(gs.today_minutes() == 55, "today has 55 min")
+	_check(gs.current_streak() == 1, "streak 1 after studying today")
+	gs.clock_override += 86400
+	_check(gs.current_streak() == 1, "streak kept next morning before studying")
+	_finish_session(gs, 15)
+	_check(gs.current_streak() == 2, "streak 2 on second day")
+	gs.clock_override += 3 * 86400
+	_check(gs.current_streak() == 0, "streak broken after skipped days")
+	_finish_session(gs, 15)
+	_check(gs.current_streak() == 1 and gs.best_streak() == 2, "new streak 1, best 2")
+	var week: Array[int] = gs.last_days(7)
+	_check(week.size() == 7 and week[6] == 15 and week[5] == 0 and week[3] == 15 and week[2] == 55, "last 7 days in order")
+	var failed_day: int = gs.today_minutes()
+	gs.inventory.append("house")
+	gs.start_session("house", 25)
+	gs.give_up()
+	_check(gs.today_minutes() == failed_day, "failed session adds no minutes")
+	gs.free()
+
+
+func _test_move_building() -> void:
+	print("move building")
+	var gs := _fresh()
+	_finish_session(gs, 1)
+	var from := Vector2i(int(gs.city[0]["x"]), int(gs.city[0]["y"]))
+	_check(gs.move_building(from, Vector2i(0, 0)), "move to empty cell")
+	_check(gs.building_at(Vector2i(0, 0)) == 0 and gs.building_at(from) == -1, "building is at new cell")
+	_finish_session(gs, 1)
+	var other := Vector2i(int(gs.city[1]["x"]), int(gs.city[1]["y"]))
+	_check(not gs.move_building(other, Vector2i(0, 0)), "cannot move onto another building")
+	_check(not gs.move_building(other, Vector2i(5, 5)), "cannot move outside the grid")
+	_check(not gs.move_building(Vector2i(2, 2), Vector2i(0, 1)), "cannot move from an empty cell")
+	gs.free()
