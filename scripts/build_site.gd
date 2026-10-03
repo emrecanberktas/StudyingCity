@@ -1,14 +1,12 @@
 extends Control
-## Seans sırasındaki inşaat alanı: iskele, ilerlemeyle yükselen bina ve tuğla taşıyan minik işçiler.
+## Seans sırasındaki inşaat alanı: iskele, ilerlemeyle yükselen bina ve tuğla taşıyan işçiler.
 
 const Buildings := preload("res://scripts/buildings.gd")
 const Iso := preload("res://scripts/iso.gd")
 const BuildingArt := preload("res://scripts/building_art.gd")
+const WorkerArt := preload("res://scripts/worker_art.gd")
 
 const WORKERS := 4
-const SKIN := Color("f1c27d")
-const OVERALLS := Color("3d6fb6")
-const HARDHAT := Color("ffd23f")
 const BRICK := Color("b5523b")
 
 var building_id := ""
@@ -49,17 +47,26 @@ func _draw() -> void:
 
 func _draw_workers(base: Vector2, pile: Vector2, tw: float) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
-	var s := tw * 0.035
-	for i in WORKERS:
-		var phase := t * (0.22 + i * 0.05) + i * 0.37
+	var s := tw * 0.03
+	var figures := []  # [ayak konumu, yön, adım, poz, görünüm] — derinlik için y'ye göre sıralanır
+
+	# Biri binanın yanında çekiçle çalışır.
+	var hammer_spot := base + Vector2(tw * 0.47, tw * 0.07)
+	figures.append([hammer_spot, -1, t * 7.0, "hammer", 0])
+
+	# Diğerleri yığından binaya tuğla taşır, boş elle geri döner.
+	for i in WORKERS - 1:
+		var phase := t * (0.16 + i * 0.03) + i * 0.41
 		var k := 0.5 - 0.5 * cos(phase * TAU)  # 0: tuğla yığını, 1: bina
 		var going := sin(phase * TAU) > 0.0
-		var a := PI * (0.2 + 0.6 * float(i) / (WORKERS - 1))
+		var a := PI * (0.25 + 0.5 * float(i) / maxf(1.0, WORKERS - 2))
 		var target := base + Vector2(cos(a) * tw * 0.42, sin(a) * tw * 0.22)
-		var p := pile.lerp(target, k) + Vector2(0, -absf(sin(t * 9.0 + i)) * s * 0.8)
-		# gövde, kafa, baret
-		draw_rect(Rect2(p + Vector2(-s * 0.6, -s * 2.2), Vector2(s * 1.2, s * 2.0)), OVERALLS)
-		draw_circle(p + Vector2(0, -s * 2.8), s * 0.7, SKIN)
-		draw_circle(p + Vector2(0, -s * 3.2), s * 0.6, HARDHAT)
-		if going:
-			draw_rect(Rect2(p + Vector2(-s * 0.8, -s * 4.6), Vector2(s * 1.6, s * 0.7)), BRICK)
+		var foot := pile.lerp(target, k)
+		var toward := 1 if target.x >= pile.x else -1
+		# Adımlar kat edilen yola bağlı: yerinde dururken bacaklar da durur.
+		var step := k * pile.distance_to(target) / (s * 1.6)
+		figures.append([foot, toward if going else -toward, step, "carry" if going else "walk", i + 1])
+
+	figures.sort_custom(func(a, b): return a[0].y < b[0].y)
+	for f in figures:
+		WorkerArt.draw(self, f[0], s, f[1], f[2], f[3], f[4])

@@ -49,6 +49,15 @@
 ## Bina çizimleri
 Her binanın kendine özgü çizimi var (`scripts/building_art.gd`): evde kiremit çatı, kafede çizgili tente ve kapı, parkta ağaçlar ve patika, kütüphanede sütunlar, okulda bayrak, saat kulesinde saat ve sivri çatı. İnşaat sırasında gövde ve pencereler yükselir, çatı ve süslemeler bina bitince gelir.
 
+## İşçiler
+İşçiler kodla çiziliyor (`scripts/worker_art.gd`): baret, reflektörlü yelek, yüz, saç, kollar ve bacaklar. Üç işçi yığından binaya başlarının üstünde tuğla taşıyıp boş elle dönüyor, bacakları yalnızca yürürken hareket ediyor. Biri binanın yanında çekiçle çalışıyor. Ten, yelek ve baret renkleri işçiden işçiye değişiyor.
+
+Hazır asset seçenekleri (araştırma, 2026-10-03):
+- Kenney "Toon Characters 1" (CC0, atıf gerekmez): yan görünüşlü insan karakterler, yürüme kareleri ve tutma pozları. İşçiler için en uygun aday.
+- Kenney "Animated Characters" serisi (CC0).
+- LPC karakter üretici (CC-BY-SA / GPL, atıf ve paylaşım şartı var).
+Bu ortamın ağ politikası kenney.nl, itch.io ve opengameart.org'u engellediği için paketler indirilemedi. Paket projeye yüklenirse `worker_art.gd` yerine sprite animasyonu kullanılabilir.
+
 ## Android
 `export_presets.cfg` içinde Android preset'i var (paket adı `com.emrecanberktas.studyingcity`, arm64 + armv7, Gradle'sız). Debug APK, Godot'nun hazır şablonuyla derlenir ve debug anahtarıyla imzalanır; Play Store için ayrı bir release anahtarı gerekir.
 
