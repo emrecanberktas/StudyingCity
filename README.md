@@ -17,9 +17,8 @@ godot --headless --path . -s res://tests/test_power_saver.gd
 - `scripts/buildings.gd` — bina kataloğu (fiyat, renk, yükseklik)
 - `scripts/main.gd` — arayüz (kodla kuruluyor), mağaza ve sonuç pencereleri
 - `scripts/map_view.gd` — izometrik şehir haritası: kaydırma, yakınlaştırma, bina taşıma
-- `scripts/worker_art.gd` — inşaat işçilerinin çizimi ve animasyon pozları
 - `scripts/building_art.gd` — binaların çizimleri (çatı, pencere, tente, ağaç, saat)
-- `scripts/build_site.gd` — inşaat alanı ve işçi animasyonu
+- `scripts/build_site.gd` — inşaat alanı ve kedi işçilerin animasyonu (`assets/workers/`)
 - `scripts/power_saver.gd` — pil tasarrufu: FPS sınırları ve eko mod (siyah ekran)
 - `scripts/iso.gd` — izometrik çizim yardımcıları
 
