@@ -28,7 +28,9 @@ var grid_size := START_GRID
 ## Aktif seans: {"building", "start", "duration", "minutes", "last_seen"}; boşsa seans yok.
 var session: Dictionary = {}
 var stats := {"sessions_ok": 0, "sessions_failed": 0, "minutes": 0}
-var settings := {"power_saver": true}
+var settings := {"power_saver": true, "daily_goal": 60}
+## Gün başına tamamlanan çalışma dakikası: {"2026-10-03": 50}
+var daily: Dictionary = {}
 
 var _pending_result: Dictionary = {}
 var _since_save := 0.0
@@ -74,7 +76,8 @@ func new_game() -> void:
 	grid_size = START_GRID
 	session = {}
 	stats = {"sessions_ok": 0, "sessions_failed": 0, "minutes": 0}
-	settings = {"power_saver": true}
+	settings = {"power_saver": true, "daily_goal": 60}
+	daily = {}
 	_pending_result = {}
 	changed.emit()
 
@@ -183,6 +186,8 @@ func _finish(success: bool) -> void:
 		_place(id)
 		stats["sessions_ok"] += 1
 		stats["minutes"] += minutes
+		var day := day_key(now())
+		daily[day] = int(daily.get(day, 0)) + minutes
 	else:
 		inventory.append(id)  # bina kaybolmaz, yeni bir seansla tekrar denenebilir
 		stats["sessions_failed"] += 1
@@ -192,7 +197,89 @@ func _finish(success: bool) -> void:
 	session_finished.emit(success, id, reward)
 
 
+# --- İstatistik ---
+
+## Yerel saate göre gün anahtarı, örn. "2026-10-03".
+func day_key(unix: float) -> String:
+	return Time.get_date_string_from_unix_time(_local(unix))
+
+
+## Yerel haftanın günü, 0 = Pazar.
+func weekday(unix: float) -> int:
+	return int(Time.get_datetime_dict_from_unix_time(_local(unix))["weekday"])
+
+
+func _local(unix: float) -> int:
+	return int(unix) + int(Time.get_time_zone_from_system().get("bias", 0)) * 60
+
+
+func minutes_on(unix: float) -> int:
+	return int(daily.get(day_key(unix), 0))
+
+
+func today_minutes() -> int:
+	return minutes_on(now())
+
+
+## Bugün ya da dün biten, art arda çalışılan gün sayısı.
+func current_streak() -> int:
+	var t := now()
+	if minutes_on(t) == 0:
+		t -= 86400.0  # bugün henüz çalışılmadıysa seri dünden sayılır
+	var streak := 0
+	while minutes_on(t) > 0:
+		streak += 1
+		t -= 86400.0
+	return streak
+
+
+func best_streak() -> int:
+	var days := daily.keys()
+	days.sort()
+	var best := 0
+	var run := 0
+	var prev := -1
+	for key in days:
+		if int(daily[key]) <= 0:
+			continue
+		var unix := Time.get_unix_time_from_datetime_string(key + "T12:00:00")
+		var index := int(round(unix / 86400.0))
+		run = run + 1 if index == prev + 1 else 1
+		prev = index
+		best = maxi(best, run)
+	return best
+
+
+## Son `count` günün dakikaları, en eskisi başta.
+func last_days(count: int) -> Array[int]:
+	var out: Array[int] = []
+	for i in range(count - 1, -1, -1):
+		out.append(minutes_on(now() - i * 86400.0))
+	return out
+
+
 # --- Şehir haritası ---
+
+func building_at(cell: Vector2i) -> int:
+	for i in city.size():
+		if int(city[i]["x"]) == cell.x and int(city[i]["y"]) == cell.y:
+			return i
+	return -1
+
+
+## Bir binayı boş bir kareye taşır.
+func move_building(from: Vector2i, to: Vector2i) -> bool:
+	var index := building_at(from)
+	if index < 0 or building_at(to) >= 0:
+		return false
+	if to.x < 0 or to.y < 0 or to.x >= grid_size or to.y >= grid_size:
+		return false
+	city[index]["x"] = to.x
+	city[index]["y"] = to.y
+	save_game()
+	changed.emit()
+	return true
+
 
 func _place(id: String) -> void:
 	var cell := _free_cell()
@@ -235,6 +322,7 @@ func save_game() -> void:
 		"session": session,
 		"stats": stats,
 		"settings": settings,
+		"daily": daily,
 	}
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
@@ -261,6 +349,7 @@ func load_game() -> void:
 	session = data.get("session", {})
 	stats.merge(data.get("stats", {}), true)
 	settings.merge(data.get("settings", {}), true)
+	daily = data.get("daily", {})
 	# Uygulama seans sırasında kapatıldıysa burada değerlendirilir.
 	check_gap()
 	tick()
