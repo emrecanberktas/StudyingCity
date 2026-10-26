@@ -35,6 +35,28 @@
 
 Ödül: dakika başına 1 coin. 25 dk'lık bir seans = 25 coin. Değerler `scripts/buildings.gd` ve `GameState.reward_for()` içinde.
 
+## Harita kontrolü
+- Tek parmakla kaydırma, iki parmakla yakınlaştırma (0.6x–3x); masaüstünde fare tekerleği. "Ortala" görünümü sıfırlar.
+- "Düzenle" modunda bir binaya, sonra boş bir kareye dokunarak bina taşınır. Yeni binalar yine otomatik olarak merkeze en yakın boş kareye konur.
+
+## İstatistik
+- Bugünkü çalışma süresi ve günlük hedef (varsayılan 60 dk, 15'er dk ayarlanır, 15–300 dk).
+- Seri: art arda çalışılan gün sayısı (bugün henüz çalışılmadıysa dünden sayılır) ve en iyi seri.
+- Son 7 günün çubuk grafiği; hedefe ulaşılan günler yeşil.
+- Toplam süre, tamamlanan ve yarıda kalan seans sayısı. Pil tasarrufu düğmesi de bu ekranda.
+- Yalnızca başarılı seansların dakikaları, seansın bittiği güne yazılır.
+
+## Bina çizimleri
+Her binanın kendine özgü çizimi var (`scripts/building_art.gd`): evde kiremit çatı, kafede çizgili tente ve kapı, parkta ağaçlar ve patika, kütüphanede sütunlar, okulda bayrak, saat kulesinde saat ve sivri çatı. İnşaat sırasında gövde ve pencereler yükselir, çatı ve süslemeler bina bitince gelir.
+
+## İşçiler
+İşçiler baretli kediler (`assets/workers/cat_*.png`, 48x48 piksel, 8 yön; Emre'nin verdiği görseller). Üç kedi yığından binaya başının üstünde tuğla taşıyıp boş geri dönüyor; yürüdükleri yöne göre 8 yönden doğru görsel seçiliyor ve yürürken hafifçe zıplıyorlar. Biri binanın yanında çekiçle vuruyor. Görseller tam sayı ölçekle ve yumuşatmasız çiziliyor, piksel sanat keskin kalıyor. Kod: `scripts/build_site.gd`.
+
+Sonra eklenebilir: her yön için yürüme kareleri gelirse zıplama yerine gerçek yürüme animasyonu.
+
+## Android
+`export_presets.cfg` içinde Android preset'i var (paket adı `com.emrecanberktas.studyingcity`, arm64 + armv7, Gradle'sız). Debug APK, Godot'nun hazır şablonuyla derlenir ve debug anahtarıyla imzalanır; Play Store için ayrı bir release anahtarı gerekir.
+
 ## Ekranlar
 - **Şehir (ana ekran):** üstte coin, ortada izometrik harita, altta bina seçici + süre + Başla + Mağaza.
 - **İnşaat:** iskele, yükselen bina, işçiler, geri sayım, ilerleme çubuğu, Vazgeç (onaylı).
@@ -50,8 +72,6 @@ session{building,start,duration,minutes,last_seen}, stats{sessions_ok,sessions_f
 Seans sırasında her 5 sn'de bir ve uygulama arka plana giderken kaydedilir; uygulama öldürülse bile açılışta `last_seen` ile değerlendirilir.
 
 ## Sonraki adımlar (öneri)
-- Gerçek sanat: izometrik bina sprite'ları, animasyonlu işçi sprite'ları.
-- Haritada kaydırma/yakınlaştırma ve binaları elle yerleştirme.
-- İstatistik ekranı (toplam süre, seri gün sayısı), günlük hedef.
+- Gerçek sanat: çizilmiş bina ve işçi sprite'ları.
 - Bildirim: seans bitince yerel bildirim (Android/iOS eklentisi gerekir).
-- Android/iOS export ayarları ve mağaza yayını.
+- iOS export ve mağaza yayını (release imzalama anahtarı).

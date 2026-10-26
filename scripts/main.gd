@@ -6,6 +6,9 @@ const Buildings := preload("res://scripts/buildings.gd")
 const MapView := preload("res://scripts/map_view.gd")
 const BuildSite := preload("res://scripts/build_site.gd")
 const PowerSaver := preload("res://scripts/power_saver.gd")
+const BuildingArt := preload("res://scripts/building_art.gd")
+
+const DAY_NAMES := ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]
 
 const DURATIONS: Array[int] = [15, 25, 30, 45, 60, 90]
 const INK := Color("3d405b")
@@ -28,6 +31,8 @@ var _progress_bar: ProgressBar
 var _overlay: Control
 var _content: Control
 var _power_button: Button
+var _edit_button: Button
+var _map_hint: Label
 var _power: Node
 var _eco_screen: Control
 var _eco_timer: Label
@@ -120,6 +125,7 @@ func _build_ui() -> void:
 	_map_view = MapView.new()
 	_map_view.set_anchors_preset(PRESET_FULL_RECT)
 	stage.add_child(_map_view)
+	_build_map_controls()
 	_build_site = BuildSite.new()
 	_build_site.set_anchors_preset(PRESET_FULL_RECT)
 	stage.add_child(_build_site)
@@ -159,13 +165,36 @@ func _build_idle_panel() -> VBoxContainer:
 
 	_start_button = _button("Çalışmaya Başla", _on_start_pressed)
 	box.add_child(_start_button)
-	box.add_child(_button("Mağaza", _open_shop))
-	_power_button = _button("", func():
-		GameState.set_setting("power_saver", not GameState.settings["power_saver"]))
-	_power_button.custom_minimum_size.y = 56
-	_power_button.add_theme_font_size_override("font_size", 24)
-	box.add_child(_power_button)
+	var row2 := HBoxContainer.new()
+	var shop := _button("Mağaza", _open_shop)
+	shop.size_flags_horizontal = SIZE_EXPAND_FILL
+	row2.add_child(shop)
+	var stats := _button("İstatistik", _open_stats)
+	stats.size_flags_horizontal = SIZE_EXPAND_FILL
+	row2.add_child(stats)
+	box.add_child(row2)
 	return box
+
+
+## Haritanın üstündeki küçük düğmeler ve düzenleme ipucu.
+func _build_map_controls() -> void:
+	var bar := HBoxContainer.new()
+	bar.set_anchors_preset(PRESET_TOP_RIGHT)
+	bar.grow_horizontal = GROW_DIRECTION_BEGIN
+	bar.position.y = 8
+	_map_view.add_child(bar)
+	_edit_button = _small_button("Düzenle", func():
+		_map_view.edit_mode = not _map_view.edit_mode
+		_edit_button.text = "Bitti" if _map_view.edit_mode else "Düzenle")
+	bar.add_child(_edit_button)
+	bar.add_child(_small_button("Ortala", _map_view.reset_view))
+
+	_map_hint = _label("")
+	_map_hint.add_theme_font_size_override("font_size", 24)
+	_map_hint.set_anchors_preset(PRESET_TOP_LEFT)
+	_map_hint.position = Vector2(4, 16)
+	_map_view.add_child(_map_hint)
+	_map_view.edit_hint_changed.connect(func(text): _map_hint.text = text)
 
 
 ## Eko modda gösterilen siyah ekran: yalnızca sönük bir sayaç.
@@ -237,7 +266,6 @@ func _refresh() -> void:
 	DisplayServer.screen_set_keep_on(active)
 	_power.enabled = GameState.settings["power_saver"]
 	_power.set_session_active(active)
-	_power_button.text = "Pil tasarrufu: %s" % ("Açık" if _power.enabled else "Kapalı")
 	_shown_second = -1
 	_shown_percent = -1.0
 	if active:
@@ -312,11 +340,7 @@ func _open_shop(message := "") -> void:
 		list.add_child(_paragraph(message))
 	for id in Buildings.ORDER:
 		var row := HBoxContainer.new()
-		var swatch := ColorRect.new()
-		swatch.color = Buildings.color(id)
-		swatch.custom_minimum_size = Vector2(44, 44)
-		swatch.size_flags_vertical = SIZE_SHRINK_CENTER
-		row.add_child(swatch)
+		row.add_child(_building_icon(id))
 		var name_label := _label(Buildings.name_of(id))
 		name_label.size_flags_horizontal = SIZE_EXPAND_FILL
 		row.add_child(name_label)
@@ -330,7 +354,90 @@ func _open_shop(message := "") -> void:
 	_show_overlay("Mağaza  (%d coin)" % GameState.coins, list, [_button("Kapat", _close_overlay)])
 
 
+func _open_stats() -> void:
+	var box := VBoxContainer.new()
+	var goal := int(GameState.settings["daily_goal"])
+	var today := GameState.today_minutes()
+
+	box.add_child(_label("Bugün: %d / %d dk" % [today, goal]))
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size.y = 24
+	bar.show_percentage = false
+	bar.max_value = goal
+	bar.value = mini(today, goal)
+	box.add_child(bar)
+
+	var goal_row := HBoxContainer.new()
+	var goal_label := _label("Günlük hedef")
+	goal_label.size_flags_horizontal = SIZE_EXPAND_FILL
+	goal_row.add_child(goal_label)
+	goal_row.add_child(_small_button("-15", _change_goal.bind(-15)))
+	goal_row.add_child(_small_button("+15", _change_goal.bind(15)))
+	box.add_child(goal_row)
+
+	var streak := GameState.current_streak()
+	box.add_child(_label("Seri: %d gün  (en iyi: %d)" % [streak, maxi(streak, GameState.best_streak())]))
+
+	box.add_child(_label("Son 7 gün"))
+	box.add_child(_week_chart(goal))
+
+	var total := int(GameState.stats["minutes"])
+	box.add_child(_paragraph("Toplam %d sa %d dk çalıştın. %d seans tamamlandı, %d seans yarıda kaldı." % [
+		total / 60, total % 60, GameState.stats["sessions_ok"], GameState.stats["sessions_failed"]]))
+
+	_power_button = _small_button("Pil tasarrufu: %s" % ("Açık" if GameState.settings["power_saver"] else "Kapalı"), func():
+		GameState.set_setting("power_saver", not GameState.settings["power_saver"])
+		_open_stats())
+	box.add_child(_power_button)
+
+	_show_overlay("İstatistik", box, [_button("Kapat", _close_overlay)])
+
+
+func _change_goal(step: int) -> void:
+	var goal := clampi(int(GameState.settings["daily_goal"]) + step, 15, 300)
+	GameState.set_setting("daily_goal", goal)
+	_open_stats()
+
+
+## Son 7 günün çubuk grafiği; hedefe ulaşılan günler yeşil.
+func _week_chart(goal: int) -> Control:
+	var days := GameState.last_days(7)
+	var chart := Control.new()
+	chart.custom_minimum_size = Vector2(0, 170)
+	chart.draw.connect(func():
+		var font := chart.get_theme_default_font()
+		var top := maxi(goal, days.max())
+		var slot := chart.size.x / days.size()
+		var chart_h := chart.size.y - 34.0
+		var goal_y := chart_h * (1.0 - float(goal) / top)
+		chart.draw_line(Vector2(0, goal_y), Vector2(chart.size.x, goal_y), Color(ACCENT, 0.6), 2.0)
+		for i in days.size():
+			var h := chart_h * days[i] / top
+			var color := Color("81b29a") if days[i] >= goal else Color("c9c3b6")
+			chart.draw_rect(Rect2(slot * i + slot * 0.2, chart_h - h, slot * 0.6, h), color)
+			var weekday := GameState.weekday(GameState.now() - (days.size() - 1 - i) * 86400.0)
+			chart.draw_string(font, Vector2(slot * i, chart.size.y - 6), DAY_NAMES[weekday], HORIZONTAL_ALIGNMENT_CENTER, slot, 20, INK))
+	return chart
+
+
+## Mağaza için küçük bina çizimi.
+func _building_icon(id: String) -> Control:
+	var icon := Control.new()
+	icon.custom_minimum_size = Vector2(64, 72)
+	# Uzun binalar küçültülerek kutuya sığdırılır.
+	var tw := minf(56.0, 62.0 / (Buildings.height(id) * 0.6 + 0.4))
+	icon.draw.connect(func(): BuildingArt.draw(icon, id, Vector2(32, 64), tw))
+	return icon
+
+
 # --- Yardımcılar ---
+
+func _small_button(text: String, on_pressed: Callable) -> Button:
+	var b := _button(text, on_pressed)
+	b.custom_minimum_size = Vector2(110, 56)
+	b.add_theme_font_size_override("font_size", 22)
+	return b
+
 
 func _show_overlay(title: String, content: Control, buttons: Array) -> void:
 	_close_overlay()
